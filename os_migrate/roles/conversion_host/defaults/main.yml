@@ -47,5 +47,3 @@ os_migrate_conversion_host_ssh_user_password: weak_password_disabled_by_default
 os_migrate_conversion_host_content_install: true
 
 os_migrate_conversion_floating_ip_address: false
-
-os_migrate_conversion_availability_zone: false
