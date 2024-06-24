@@ -74,6 +74,7 @@ test-func-tenant: reinstall
 		-e os_migrate_tests_tmp_dir=$(ROOT_DIR)/tests/func/tmp \
 		-e os_migrate_data_dir=$(ROOT_DIR)/tests/func/tmp/data \
 		-e @$(ROOT_DIR)/tests/auth_tenant.yml \
+		-e skip_auth_checks=true \
 		$(OS_MIGRATE_FUNC_TEST_ARGS) test_as_tenant.yml
 
 test-func-admin: reinstall
@@ -89,6 +90,7 @@ test-func-admin: reinstall
 		-e os_migrate_tests_tmp_dir=$(ROOT_DIR)/tests/func/tmp \
 		-e os_migrate_data_dir=$(ROOT_DIR)/tests/func/tmp/data \
 		-e @$(ROOT_DIR)/tests/auth_admin.yml \
+		-e skip_auth_checks=true \
 		$(OS_MIGRATE_FUNC_TEST_ARGS) test_as_admin.yml
 
 test-e2e: test-e2e-tenant test-e2e-admin
