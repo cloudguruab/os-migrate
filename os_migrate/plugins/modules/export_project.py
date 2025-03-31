@@ -91,7 +91,7 @@ except ImportError:
 
 from ansible_collections.os_migrate.os_migrate.plugins.module_utils import filesystem
 from ansible_collections.os_migrate.os_migrate.plugins.module_utils import project
-
+import sys
 
 def run_module():
     argument_spec = openstack_full_argument_spec(
@@ -100,6 +100,7 @@ def run_module():
     )
     # TODO: check the del
     # del argument_spec['cloud']
+    sys.stdout.write(f"--test-- {argument_spec}")
 
     result = dict(
         changed=False,
@@ -111,7 +112,8 @@ def run_module():
         # if the file representation matches it.
         # supports_check_mode=True,
     )
-
+    sys.stdout.write(f"--test-- {module.params}")
+    raise ValidationError
     sdk, conn = openstack_cloud_from_module(module)
     sdk_project = conn.identity.find_project(module.params['name'], ignore_missing=False)
     data = project.Project.from_sdk(conn, sdk_project)

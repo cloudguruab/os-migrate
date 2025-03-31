@@ -1,0 +1,43 @@
+# Building customer ansible module for openstacksdk (Removing dependencies)
+- Why not "lift and replace" python code to python code? 
+    - Although it's a faster approach (saves a few days sprint to sprint with this "migration" from dependency on ansible-openstack collection) my underlying assumption is around performance on hardware when running os-migrate: 
+        - Why go is better than python: 
+            - Strongly typed/no waste
+            - Compiled not interpreted/super fast compiles times as a result
+            - Built in concurrency (I've spent way too much time trying to get os-migrate's data copy mode to flush well with this paradigm) 
+            - Gives the team flexibility to "lift and replace" any part of os-migrate over time as we scale the product (upsides to UX)
+        - Why python is better than go:
+            - Low ramp-up time
+            - Consistency - read types/objects into existing code around our codebase
+        - Trade-offs
+            - Python: concurrency sucks/so many "hacks" to fix incremental bugs and has led to our dependencies in the first place with no availability to truly customize os-migrate the way we need to (parallel cloud migrations needs flexibility in code not just design)
+            - Go: [I'm biased lol - will leave this short]: going for performance/eventual consistency over tight/strict consistency here. 
+- ansible-openstack-collection current implementation details: 
+    - ex; project creation; https://github.com/openstack/ansible-collections-openstack/blob/master/plugins/modules/project.py#L127
+        - All abstract bases have a run method called on every instance
+        - Here run is called to check state of a ansible task 
+        - State dictates the call to a 'service provider/client' 
+        - This communication from code to service api happens with inheritted `self.conn.identity.create_project(**kwargs)` 
+    - ex; `self.conn` is a parent var from; https://github.com/openstack/ansible-collections-openstack/blob/master/plugins/module_utils/openstack.py#L268 
+        - this is defined further in; https://github.com/openstack/ansible-collections-openstack/blob/master/plugins/module_utils/openstack.py#L161 
+            - This is used in a lot of our module_utils for os-migrate (easy to replicate into code)
+            - This abstraction is used to communicate with service api's via openstacksdk in our python libraries. 
+            - For golang it'll be gophercloud to replicate the same functions while optimizing for memory/resources on hardware. 
+    - ex; gophercloud representation of project creation (we'll hand write the `self.conn` or what I'm calling our Provider Clients to communicate with service APIs i.e. gophercloud)
+        - Here is a snippet of a `Create` project service request directly from the go alternative to openstacksdk - https://github.com/gophercloud/gophercloud/blob/9e4535f6f0974f25793e62c03e2794097dfa1a43/openstack/identity/v3/projects/requests.go#L160
+        - Here is documentation on building a Provider client and Service client with gophercloud - https://github.com/gophercloud/gophercloud/tree/9e4535f6f0974f25793e62c03e2794097dfa1a43 (we will read directly from users ansible roles/tasks here so manual intervention for creating "Providers" will be my assumptions for communicating with gopherclouds "Service" clients)
+        - The most custom piece to our code for these changes will be reading from ansible modules into go/so-on while maintaining existing filters/formatting when parsing objects within our tasks/roles throughout os-migrate (this would take the longest to nail down in terms of iteration - i.e. ensuring if something small breaks or a key/value pair is missing we push a change/PR to github to support customers using this optimized approach to os-migrates dependencies)
+
+My timebox/estimation from zero-to-hero or start to finish with this scope of work: (1 year 3 months)
+    - Milestones: 
+        - 3-months: initial scope of work/discovery
+            - definition of done: initial PR's merged, one small component or area of the code base using this module/code, general ideas as a team of all the areas we'll need to make tweaks to remove `openstack.cloud...` from our roles/tasks i.e. 91 places as of March 2025. 
+        - 6-months: canary release of new "Service" clients to customers
+            - definition of done: starting with keystone (projects, auth_info, connecting to openstack from ansible), then we gradually handle services like compute, ironic, block store/etc....
+            - first 2 sprints we can count as discovery work for each new service client
+        - 3-months: QA changes/hackathon 
+            - Community style bug squashing 
+            - Definition of done: fixing any lingering bugs/missing references between old ansible modules and new, documentation 
+        - 3-months: Maintence mode/ Performance & Scale Lab 2.0 
+            - Testing new "engine" for os-migrate 
+            - Addressing any feature requests/issues presented from hackathon

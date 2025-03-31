@@ -1,97 +1,132 @@
 package pkg
 
-// CustomVarParams defines parameters that are custom variables
-var CustomVarParams = []string{"min_ver", "max_ver"}
+import "encoding/json"
+import "fmt"
+import "os"
+import "runtime/debug"
 
-// Overrides maps deprecated module names to their new names
-var Overrides = make(map[string]string)
-
-// GetOpenStackFullArgumentSpec returns the full OpenStack argument specification
-func GetOpenStackFullArgumentSpec(kwargs map[string]interface{}) map[string]interface{} {
-	spec := map[string]interface{}{
-		"cloud": map[string]interface{}{
-			"type": "raw",
-		},
-		"auth_type": map[string]interface{}{},
-		"auth": map[string]interface{}{
-			"type":    "dict",
-			"no_log": true,
-		},
-		"region_name": map[string]interface{}{},
-		"validate_certs": map[string]interface{}{
-			"type":    "bool",
-			"aliases": []string{"verify"},
-		},
-		"ca_cert": map[string]interface{}{
-			"aliases": []string{"cacert"},
-		},
-		"client_cert": map[string]interface{}{
-			"aliases": []string{"cert"},
-		},
-		"client_key": map[string]interface{}{
-			"no_log": true,
-			"aliases": []string{"key"},
-		},
-		"wait": map[string]interface{}{
-			"default": true,
-			"type":    "bool",
-		},
-		"timeout": map[string]interface{}{
-			"default": 180,
-			"type":    "int",
-		},
-		"api_timeout": map[string]interface{}{
-			"type": "int",
-		},
-		"interface": map[string]interface{}{
-			"default": "public",
-			"choices": []string{"public", "internal", "admin"},
-			"aliases": []string{"endpoint_type"},
-		},
-		"sdk_log_path": map[string]interface{}{},
-		"sdk_log_level": map[string]interface{}{
-			"default": "INFO",
-			"choices": []string{"INFO", "DEBUG"},
-		},
+func returnResponse(responseBody ModuleResult) {
+	var response []byte
+	var err error
+	response, err = json.Marshal(responseBody)
+	if err != nil {
+		response, _ = json.Marshal(ModuleResult{Data: map[string]interface{}{"response": "Invalid json object"}})
+		responseBody.Error = err
 	}
-
-	// Filter out custom parameters
-	kwargsCopy := make(map[string]interface{})
-	for k, v := range kwargs {
-		kwargsCopy[k] = v
+	fmt.Println(string(response))
+	if responseBody.Error != nil {
+		os.Exit(1)
+	} else {
+		os.Exit(0)
 	}
-
-	for _, param := range CustomVarParams {
-		for _, v := range kwargsCopy {
-			if m, ok := v.(map[string]interface{}); ok {
-				delete(m, param)
-			}
-		}
-	}
-
-	// Update spec with kwargs
-	for k, v := range kwargsCopy {
-		spec[k] = v
-	}
-
-	return spec
 }
 
-// GetOpenStackModuleKwargs returns module kwargs
-func GetOpenStackModuleKwargs(kwargs map[string]interface{}) map[string]interface{} {
-	ret := make(map[string]interface{})
-	for _, key := range []string{"mutually_exclusive", "required_together", "required_one_of"} {
-		if v, ok := kwargs[key]; ok {
-			if existing, exists := ret[key]; exists {
-				if existingSlice, ok := existing.([]interface{}); ok {
-					if newSlice, ok := v.([]interface{}); ok {
-						ret[key] = append(existingSlice, newSlice...)
-					}
-				}
-			} else {
-				ret[key] = v
-			}
+func NewModule() *OpenStackModule {
+	// Set the module 
+	module := &OpenStackModule{
+		Results: ModuleResult{Changed: false},
+		ArgumentSpec: make(map[string]ArgumentSpec),
+		ModuleName: "Ansible OpenStack Module (Gophercloud)",
+	}
+
+	// Get the SDK version
+	info, _ := debug.ReadBuildInfo()
+	for _, dep := range info.Deps {
+		if dep.Path == "github.com/gophercloud/gophercloud" {
+			module.SDKVersion = dep.Version
 		}
 	}
-	return ret
+	return module
+}
+
+func ExitJson(responseBody ModuleResult) {
+	returnResponse(responseBody)
+}
+
+func FailJson(responseBody ModuleResult) {
+	responseBody.Changed = true
+	returnResponse(responseBody)
+}
+
+func (m *OpenStackModule) Log(msg string, level string) {
+	// Default to INFO if level not specified
+	if level == "" {
+		level = m.ArgumentSpec["sdk_log_level"].Default.(string)
+	}
+
+	switch level {
+	case "DEBUG":
+		FailJson(ModuleResult{Data: map[string]interface{}{fmt.Sprintf("[%s]", level): msg}})
+	case "INFO":
+		ExitJson(ModuleResult{Data: map[string]interface{}{fmt.Sprintf("[%s]", level): msg}})
+	case "WARNING":
+		ExitJson(ModuleResult{Data: map[string]interface{}{fmt.Sprintf("[%s]", level): msg}})
+	case "ERROR":
+		FailJson(ModuleResult{Data: map[string]interface{}{fmt.Sprintf("[%s]", level): msg}})
+	default:
+		ExitJson(ModuleResult{Data: map[string]interface{}{fmt.Sprintf("[%s]", level): msg}})
+	}
+}
+
+// Sets up a gophercloud ProviderClient from module arguments
+func (m *OpenStackModule) OpenStackCloudFromModule() error {
+	return nil
+}
+
+// NOTE: not needed, helpful for tracking module arguments
+func GetOpenStackArgumentSpec() OpenStackArgumentSpec {
+	return OpenStackArgumentSpec{
+		Cloud: ArgumentSpec{
+			Type: "raw",
+		},
+		AuthType: ArgumentSpec{},
+		Auth: ArgumentSpec{
+			Type:  "dict",
+			NoLog: true,
+		},
+		RegionName: ArgumentSpec{},
+		ValidateCerts: ArgumentSpec{
+			Type:    "bool",
+			Aliases: []string{"verify"},
+		},
+		CACert: ArgumentSpec{
+			Aliases: []string{"cacert"},
+		},
+		ClientCert: ArgumentSpec{
+			Aliases: []string{"cert"},
+		},
+		ClientKey: ArgumentSpec{
+			NoLog:   true,
+			Aliases: []string{"key"},
+		},
+		Wait: ArgumentSpec{
+			Default: true,
+			Type:    "bool",
+		},
+		Timeout: ArgumentSpec{
+			Default: 180,
+			Type:    "int",
+		},
+		APITimeout: ArgumentSpec{
+			Type: "int",
+		},
+		Interface: ArgumentSpec{
+			Default: "public",
+			Choices: []string{"public", "internal", "admin"},
+			Aliases: []string{"endpoint_type"},
+		},
+		SDKLogPath: ArgumentSpec{},
+		SDKLogLevel: ArgumentSpec{
+			Default: "INFO",
+			Choices: []string{"INFO", "DEBUG"},
+		},
+		Path: ArgumentSpec{
+			Type:     "str",
+			Required: true,
+		},
+		Name: ArgumentSpec{
+			Type:     "str",
+			Required: true,
+		},
+	}
 }
