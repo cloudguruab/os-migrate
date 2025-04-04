@@ -94,7 +94,7 @@ from ansible_collections.os_migrate.os_migrate.plugins.module_utils import proje
 import sys
 
 def run_module():
-    argument_spec = openstack_full_argument_spec(
+    argument_spec = openstack_full_argument_spec( # NOTE: can remove this with gophercloud
         path=dict(type='str', required=True),
         name=dict(type='str', required=True),
     )
@@ -106,7 +106,7 @@ def run_module():
         changed=False,
     )
 
-    module = AnsibleModule(
+    module = AnsibleModule( # NOTE: can remove this with gophercloud
         argument_spec=argument_spec,
         # TODO: Consider check mode. We'd fetch the resource and check
         # if the file representation matches it.
@@ -114,7 +114,7 @@ def run_module():
     )
     sys.stdout.write(f"--test-- {module.params}")
     raise ValidationError
-    sdk, conn = openstack_cloud_from_module(module)
+    sdk, conn = openstack_cloud_from_module(module) # NOTE: condensed from 2-3 calls into 1 with go
     sdk_project = conn.identity.find_project(module.params['name'], ignore_missing=False)
     data = project.Project.from_sdk(conn, sdk_project)
 
