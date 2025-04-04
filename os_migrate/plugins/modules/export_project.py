@@ -91,28 +91,30 @@ except ImportError:
 
 from ansible_collections.os_migrate.os_migrate.plugins.module_utils import filesystem
 from ansible_collections.os_migrate.os_migrate.plugins.module_utils import project
-
+import sys
 
 def run_module():
-    argument_spec = openstack_full_argument_spec(
+    argument_spec = openstack_full_argument_spec( # NOTE: can remove this with gophercloud
         path=dict(type='str', required=True),
         name=dict(type='str', required=True),
     )
     # TODO: check the del
     # del argument_spec['cloud']
+    sys.stdout.write(f"--test-- {argument_spec}")
 
     result = dict(
         changed=False,
     )
 
-    module = AnsibleModule(
+    module = AnsibleModule( # NOTE: can remove this with gophercloud
         argument_spec=argument_spec,
         # TODO: Consider check mode. We'd fetch the resource and check
         # if the file representation matches it.
         # supports_check_mode=True,
     )
-
-    sdk, conn = openstack_cloud_from_module(module)
+    sys.stdout.write(f"--test-- {module.params}")
+    raise ValidationError
+    sdk, conn = openstack_cloud_from_module(module) # NOTE: condensed from 2-3 calls into 1 with go
     sdk_project = conn.identity.find_project(module.params['name'], ignore_missing=False)
     data = project.Project.from_sdk(conn, sdk_project)
 
